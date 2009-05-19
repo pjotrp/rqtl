@@ -2,22 +2,21 @@
 #
 # compareorder.R
 #
-# copyright (c) 2007-8, Karl W Broman
-# last modified Aug, 2008
+# copyright (c) 2007-9, Karl W Broman
+# last modified May, 2009
 # first written Oct, 2007
 #
 #     This program is free software; you can redistribute it and/or
-#     modify it under the terms of the GNU General Public License, as
-#     published by the Free Software Foundation; either version 2 of
-#     the License, or (at your option) any later version. 
+#     modify it under the terms of the GNU General Public License,
+#     version 3, as published by the Free Software Foundation.
 # 
 #     This program is distributed in the hope that it will be useful,
 #     but without any warranty; without even the implied warranty of
-#     merchantability or fitness for a particular purpose.  See the
-#     GNU General Public License for more details.
+#     merchantability or fitness for a particular purpose.  See the GNU
+#     General Public License, version 3, for more details.
 # 
-#     A copy of the GNU General Public License is available at
-#     http://www.r-project.org/Licenses/
+#     A copy of the GNU General Public License, version 3, is available
+#     at http://www.r-project.org/Licenses/GPL-3
 #
 # Part of the R/qtl package
 # Contains: compareorder
@@ -31,7 +30,7 @@
 compareorder <-
 function(cross, chr, order, error.prob=0.0001,
          map.function=c("haldane","kosambi","c-f","morgan"),
-         maxit=4000, tol=0.0001, sex.sp=TRUE)
+         maxit=4000, tol=1e-6, sex.sp=TRUE)
 {
   if(missing(chr)) chr <- names(cross$geno)[1]
   if(length(chr) > 1) {
@@ -43,11 +42,13 @@ function(cross, chr, order, error.prob=0.0001,
   cross <- subset(cross, chr)
 
   if(length(order) != totmar(cross)) {
-    if(length(order) == totmar(cross)+1)
-      order <- order[-length(order)]
+    if(length(order) == totmar(cross)+1 || length(order) == totmar(cross)+2)
+      order <- order[1:totmar(cross)]
     else
       stop("Argument 'order' should have length ", totmar(cross))
   }
+  if(any(is.na(match(1:totmar(cross), order))))
+    stop("order should be a permutation of the numbers 1, 2, ..., ", totmar(cross))
 
   orig <- est.map(cross, error.prob=error.prob, map.function=map.function,
                   maxit=maxit, tol=tol, sex.sp=sex.sp, verbose=FALSE)

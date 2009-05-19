@@ -5,21 +5,20 @@
 # copyright (c) 2001-9, Karl W Broman
 #     [find.pheno, find.flanking, and a modification to create.map
 #      from Brian Yandell]
-# last modified Mar, 2009
+# last modified May, 2009
 # first written Feb, 2001
 #
 #     This program is free software; you can redistribute it and/or
-#     modify it under the terms of the GNU General Public License, as
-#     published by the Free Software Foundation; either version 2 of
-#     the License, or (at your option) any later version. 
+#     modify it under the terms of the GNU General Public License,
+#     version 3, as published by the Free Software Foundation.
 # 
 #     This program is distributed in the hope that it will be useful,
 #     but without any warranty; without even the implied warranty of
-#     merchantability or fitness for a particular purpose.  See the
-#     GNU General Public License for more details.
+#     merchantability or fitness for a particular purpose.  See the GNU
+#     General Public License, version 3, for more details.
 # 
-#     A copy of the GNU General Public License is available at
-#     http://www.r-project.org/Licenses/
+#     A copy of the GNU General Public License, version 3, is available
+#     at http://www.r-project.org/Licenses/GPL-3
 # 
 # Part of the R/qtl package
 # Contains: pull.map, markernames, replace.map, c.cross, create.map,
@@ -37,7 +36,7 @@
 #           find.flanking, strip.partials, comparegeno
 #           qtlversion, locate.xo, jittermap, getid,
 #           find.markerpos, geno.crosstab, LikePheVector,
-#           matchchr, convert2sa, charround
+#           matchchr, convert2sa, charround, testchr
 #
 ######################################################################
 
@@ -83,6 +82,20 @@ function(cross, chr)
   temp <- unlist(lapply(cross$geno, function(a) colnames(a$data)))
   names(temp) <- NULL
   temp
+}
+
+######################################################################
+#
+# chrnames
+#
+# pull out the chrnames for a cross
+#
+######################################################################
+
+chrnames <- 
+function(cross)
+{
+  names(cross$geno)
 }
 
 ######################################################################
@@ -306,7 +319,7 @@ function(map, step, off.end, stepwidth = c("fixed", "variable"))
 # clean functions
 ######################################################################
 clean <-
-function(object)
+function(object, ...)
   UseMethod("clean")
 
 
@@ -321,7 +334,7 @@ function(object)
 ######################################################################
 
 clean.cross <-
-function(object)
+function(object, ...)
 {
   if(!any(class(object) == "cross"))
     stop("Input should have class \"cross\".")
@@ -762,6 +775,14 @@ function(cross, mname1, mname2, eliminate.zeros=TRUE)
   if(!any(class(cross) == "cross"))
     stop("Input should have class \"cross\".")
 
+  if(missing(mname2) && length(mname1)>1) {
+    mname2 <- mname1[2]
+    mname1 <- mname1[1]
+  }
+
+  if(length(mname1) > 1 || length(mname2) > 1)
+    stop("mname1 and mname2 should both have lenght 1, or mname1 should have length 2 and mname1 should be missing.")
+
   if(mname1==mname2)
     stop("You must give two distinct marker names.")
 
@@ -902,7 +923,7 @@ function(d)
 switch.order <-
 function(cross, chr, order, error.prob=0.0001,
          map.function=c("haldane","kosambi","c-f","morgan"),
-         maxit=4000, tol=1e-4, sex.sp=TRUE)
+         maxit=4000, tol=1e-6, sex.sp=TRUE)
 {
   if(!any(class(cross) == "cross"))
     stop("Input should have class \"cross\".")
@@ -910,16 +931,19 @@ function(cross, chr, order, error.prob=0.0001,
   map.function <- match.arg(map.function)
   
   # check chromosome argument
-  if(!missing(chr)) {
-    chr <- matchchr(chr, names(cross$geno))
-    if(length(chr) > 1) {
-      warning("switch.order can deal with just one chromosome at a time")
-      chr <- chr[1]
-    }
-    cchr <- chr
-    chr <- match(chr, names(cross$geno))
+  if(missing(chr)) {
+    chr <- names(cross$geno)[1]
+    warning("Assuming you mean chromosome ", chr)
   }
-  else chr <- 1
+  else {
+    if(length(chr) > 1) {
+      chr <- chr[1]
+      warning("switch.order can deal with just one chromosome at a time; assuming you want chr ", chr)
+    }
+    if(!testchr(chr, names(cross$geno)))
+       stop("Chr ", chr, " not found.")
+  }
+  chr <- matchchr(chr, names(cross$geno))
 
   # check order argument
   n.mar <- nmar(cross)
@@ -962,13 +986,13 @@ function(cross, chr, order, error.prob=0.0001,
 
   # re-estimate rec fracs for re-ordered chromosome
   if(flag==1) {
-    temp <- est.rf(subset(cross, chr=cchr))$rf
+    temp <- est.rf(subset(cross, chr=chr))$rf
     rf[oldcols,oldcols] <- temp
     cross$rf <- rf
   }
 
   # re-estimate map
-  newmap <- est.map(subset(cross,chr=cchr),
+  newmap <- est.map(subset(cross,chr=chr),
                     error.prob=error.prob, map.function=map.function,
                     maxit=maxit, tol=tol, sex.sp=sex.sp)
 
@@ -1285,14 +1309,15 @@ function(...)
   # indicator of which cross
   whichcross <- matrix(0,ncol=n.args,nrow=sum(n.ind))
   colnames(whichcross) <- paste("cross",1:n.args,sep="")
+  thecross <- rep(NA, sum(n.ind))
   prev <- 0
   for(i in 1:n.args) {
     wh <- prev + 1:n.ind[i]
     prev <- prev + n.ind[i]
     whichcross[wh,i] <- 1
+    thecross[wh] <- i
   }
-  pheno <- cbind(pheno,whichcross)
-
+  pheno <- cbind(pheno,cross=thecross,whichcross)
 
   x$pheno <- pheno
 
@@ -1304,6 +1329,7 @@ function(...)
     error.prob <- sapply(args,function(a) attr(a$geno[[1]]$prob,"error.prob"))
     off.end <- sapply(args,function(a) attr(a$geno[[1]]$prob,"off.end"))
     map.function <- sapply(args,function(a) attr(a$geno[[1]]$prob,"map.function"))
+    map <- sapply(args,function(a) attr(a$geno[[1]]$prob,"map"))
     if(!any(is.na(wh)) && length(unique(step))==1 &&
        length(unique(error.prob))==1 && length(unique(off.end))==1 &&
        length(unique(map.function))==1) {
@@ -1338,10 +1364,18 @@ function(...)
       }    
   
       for(j in 1:nchr(x)) {
+        wh <- sapply(args, function(a) match("prob",names(a$geno[[j]])))
+        step <- sapply(args,function(a) attr(a$geno[[j]]$prob,"step"))
+        error.prob <- sapply(args,function(a) attr(a$geno[[j]]$prob,"error.prob"))
+        off.end <- sapply(args,function(a) attr(a$geno[[j]]$prob,"off.end"))
+        map.function <- sapply(args,function(a) attr(a$geno[[j]]$prob,"map.function"))
+        map <- sapply(args,function(a) attr(a$geno[[j]]$prob,"map"))
+
         attr(geno[[j]]$prob,"step") <- step[1]
         attr(geno[[j]]$prob,"error.prob") <- error.prob[1]
         attr(geno[[j]]$prob,"off.end") <- off.end[1]
         attr(geno[[j]]$prob,"map.function") <- map.function[1]
+        attr(geno[[j]]$prob,"map") <- map[1]
       }
     }
   
@@ -1352,6 +1386,7 @@ function(...)
     error.prob <- sapply(args,function(a) attr(a$geno[[1]]$draws,"error.prob"))
     off.end <- sapply(args,function(a) attr(a$geno[[1]]$draws,"off.end"))
     map.function <- sapply(args,function(a) attr(a$geno[[1]]$draws,"map.function"))
+    map <- sapply(args,function(a) attr(a$geno[[1]]$draws,"map"))
     ndraws <- sapply(args,function(a) dim(a$geno[[1]]$draws)[3])
     if(!any(is.na(wh)) && length(unique(step))==1 &&
        length(unique(error.prob))==1 && length(unique(off.end))==1 &&
@@ -1366,10 +1401,18 @@ function(...)
           geno[[j]]$draws[wh,,] <- args[[i]]$geno[[j]]$draws
         }
   
+        wh <- sapply(args, function(a) match("draws",names(a$geno[[j]])))
+        step <- sapply(args,function(a) attr(a$geno[[j]]$draws,"step"))
+        error.prob <- sapply(args,function(a) attr(a$geno[[j]]$draws,"error.prob"))
+        off.end <- sapply(args,function(a) attr(a$geno[[j]]$draws,"off.end"))
+        map.function <- sapply(args,function(a) attr(a$geno[[j]]$draws,"map.function"))
+        map <- sapply(args,function(a) attr(a$geno[[j]]$draws,"map"))
+
         attr(geno[[j]]$draws,"step") <- step[1]
         attr(geno[[j]]$draws,"error.prob") <- error.prob[1]
         attr(geno[[j]]$draws,"off.end") <- off.end[1]
         attr(geno[[j]]$draws,"map.function") <- map.function[1]
+        attr(geno[[j]]$draws,"map") <- map[1]
       }
     }
   }
@@ -3025,6 +3068,52 @@ function(selection, thechr)
 }
 
 ######################################################################
+# check that chromosomes match appropriately
+# TRUE = chr okay
+# FALSE = problem
+######################################################################
+testchr <-
+function(selection, thechr)
+{
+  if(is.factor(thechr)) thechr <- as.character(thechr)
+  if(length(thechr) > length(unique(thechr))) {
+#    warning("Duplicate chromosome names.")
+    return(FALSE)
+  }
+
+  if(is.logical(selection)) {
+    if(length(selection) != length(thechr)) {
+#      warning("Logical vector to select chromosomes is the wrong length")
+      return(FALSE)
+    }
+    return(TRUE)
+  }
+
+  if(is.numeric(selection)) selection <- as.character(selection)
+
+  if(length(selection) > length(unique(selection))) {
+#    warning("Dropping duplicate chromosomes")
+    selection <- unique(selection)
+  }
+
+  g <- grep("^-", selection)
+  if(length(g) > 0 && length(g) < length(selection)) {
+#    stop("In selecting chromosomes, all must start with '-' or none should.")
+    return(FALSE)
+  }
+  if(length(g) > 0) {
+    selectomit <- TRUE
+    selection <- substr(selection, 2, nchar(selection))
+  }
+  else selectomit <- FALSE
+      
+  wh <- match(selection, thechr)
+  if(any(is.na(wh))) return(FALSE)
+
+  TRUE
+}
+
+######################################################################
 # convert2sa
 #
 # convert a sex-specific maps to a sex-averaged one.
@@ -3035,7 +3124,7 @@ convert2sa <-
 function(map, tol=1e-4)
 {  
   if(!("map" %in% class(map)))
-     stop("Input should have class 'map'.")
+     stop("Input should have class \"map\".")
 
   if(!is.matrix(map[[1]]))
     stop("Input map doesn't seem to be a sex-specific map.")
