@@ -8,7 +8,7 @@ cmake_minimum_required(VERSION 2.6)
 
 PROJECT(Biolib_rqtl)
 SET (M_NAME rqtl)
-SET (M_VERSION 1.12-19)
+# SET (M_VERSION 1.12-x)
 
 IF(NOT BUILD_LIBS)
   # Building in a local module: Set the module search path manually
@@ -21,8 +21,6 @@ ENDIF(NOT BUILD_LIBS)
 
 FIND_PACKAGE(RLibs REQUIRED)  # require some Rlib functionality at runtime
 FIND_PACKAGE(Map REQUIRED)
-
-SET(LIBNAME biolib_rqtl-${BIOLIB_VERSION})  # shared library name
 
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ../../build)
 
